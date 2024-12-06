@@ -6,6 +6,10 @@
 
 A Model Context Protocol server that provides access to MongoDB databases. This server enables LLMs to inspect collection schemas and execute read-only queries.
 
+## Demo
+
+[![MCP MongoDB Server Demo | Claude Desktop](https://img.youtube.com/vi/FI-oE_voCpA/0.jpg)](https://www.youtube.com/watch?v=FI-oE_voCpA)
+
 ## Features
 
 ### Resources
