@@ -55,15 +55,7 @@ For development with auto-rebuild:
 npm run watch
 ```
 
-## Installation
-
-### Using mcp-get
-
-You can install this package using mcp-get:
-
-```bash
-npx @michaellatman/mcp-get@latest install mcp-mongo-server
-```
+## Installation for Development
 
 ### Using Claude Desktop
 
@@ -110,6 +102,14 @@ The server provides schema information for each collection in the database:
   - Includes field names and data types
   - Automatically inferred from collection documents
 
+
+## Using mcp-get
+
+You can install this package using mcp-get:
+
+```bash
+npx @michaellatman/mcp-get@latest install mcp-mongo-server
+```
 
 ## Usage with Claude Desktop
 
