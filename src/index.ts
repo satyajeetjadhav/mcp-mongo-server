@@ -19,9 +19,10 @@ import {
   ListPromptsRequestSchema,
   GetPromptRequestSchema,
   ListResourceTemplatesRequestSchema,
+  PingRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
-import { MongoClient, ServerApiVersion } from "mongodb";
-import { MongoCollection } from './types.js';
+import { MongoClient } from "mongodb";
+import { MongoCollection } from "./types.js";
 
 /**
  * MongoDB connection client and database reference
@@ -36,7 +37,7 @@ let db: any = null;
 const server = new Server(
   {
     name: "mongodb",
-    version: "0.2.0",
+    version: "1.0.0",
   },
   {
     capabilities: {
@@ -44,7 +45,7 @@ const server = new Server(
       tools: {},
       prompts: {},
     },
-  }
+  },
 );
 
 /**
@@ -52,13 +53,7 @@ const server = new Server(
  */
 async function connectToMongoDB(url: string) {
   try {
-    client = new MongoClient(url, {
-      serverApi: {
-        version: ServerApiVersion.v1,
-        strict: true,
-        deprecationErrors: true,
-      },
-    });
+    client = new MongoClient(url);
     await client.connect();
     db = client.db();
     return true;
@@ -67,6 +62,28 @@ async function connectToMongoDB(url: string) {
     return false;
   }
 }
+
+/**
+ * Handler for ping requests to check server health
+ */
+server.setRequestHandler(PingRequestSchema, async () => {
+  try {
+    // Check MongoDB connection
+    if (!client) {
+      throw new Error("MongoDB connection is not available");
+    }
+
+    // Ping MongoDB to verify connection
+    await db.command({ ping: 1 });
+
+    return {};
+  } catch (error) {
+    if (error instanceof Error) {
+      throw new Error(`MongoDB ping failed: ${error.message}`);
+    }
+    throw new Error("MongoDB ping failed: Unknown error");
+  }
+});
 
 /**
  * Handler for listing available collections as resources.
@@ -90,7 +107,7 @@ server.setRequestHandler(ListResourcesRequestSchema, async () => {
     if (error instanceof Error) {
       throw new Error(`Failed to list collections: ${error.message}`);
     }
-    throw new Error('Failed to list collections: Unknown error');
+    throw new Error("Failed to list collections: Unknown error");
   }
 });
 
@@ -108,36 +125,44 @@ server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
     const indexes = await collection.indexes();
 
     // Infer schema from sample document
-    const schema = sample ? {
-      type: "collection",
-      name: collectionName,
-      fields: Object.entries(sample).map(([key, value]) => ({
-        name: key,
-        type: typeof value,
-      })),
-      indexes: indexes.map((idx: any) => ({
-        name: idx.name,
-        keys: idx.key,
-      })),
-    } : {
-      type: "collection",
-      name: collectionName,
-      fields: [],
-      indexes: [],
-    };
+    const schema = sample
+      ? {
+          type: "collection",
+          name: collectionName,
+          fields: Object.entries(sample).map(([key, value]) => ({
+            name: key,
+            type: typeof value,
+          })),
+          indexes: indexes.map((idx: any) => ({
+            name: idx.name,
+            keys: idx.key,
+          })),
+        }
+      : {
+          type: "collection",
+          name: collectionName,
+          fields: [],
+          indexes: [],
+        };
 
     return {
-      contents: [{
-        uri: request.params.uri,
-        mimeType: "application/json",
-        text: JSON.stringify(schema, null, 2)
-      }]
+      contents: [
+        {
+          uri: request.params.uri,
+          mimeType: "application/json",
+          text: JSON.stringify(schema, null, 2),
+        },
+      ],
     };
   } catch (error) {
     if (error instanceof Error) {
-      throw new Error(`Failed to read collection ${collectionName}: ${error.message}`);
+      throw new Error(
+        `Failed to read collection ${collectionName}: ${error.message}`,
+      );
     }
-    throw new Error(`Failed to read collection ${collectionName}: Unknown error`);
+    throw new Error(
+      `Failed to read collection ${collectionName}: Unknown error`,
+    );
   }
 });
 
@@ -150,49 +175,254 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
     tools: [
       {
         name: "query",
-        description: "Execute a MongoDB query",
+        description:
+          "Execute a MongoDB query with optional execution plan analysis",
         inputSchema: {
           type: "object",
           properties: {
             collection: {
               type: "string",
-              description: "Name of the collection to query"
+              description: "Name of the collection to query",
             },
             filter: {
               type: "object",
-              description: "MongoDB query filter"
+              description: "MongoDB query filter",
             },
             projection: {
               type: "object",
-              description: "Fields to include/exclude"
+              description: "Fields to include/exclude",
             },
             limit: {
               type: "number",
-              description: "Maximum number of documents to return"
-            }
+              description: "Maximum number of documents to return",
+            },
+            explain: {
+              type: "string",
+              description:
+                "Optional: Get query execution information (queryPlanner, executionStats, or allPlansExecution)",
+              enum: ["queryPlanner", "executionStats", "allPlansExecution"],
+            },
           },
-          required: ["collection"]
-        }
+          required: ["collection"],
+        },
       },
       {
         name: "aggregate",
-        description: "Execute a MongoDB aggregation pipeline",
+        description:
+          "Execute a MongoDB aggregation pipeline with optional execution plan analysis",
         inputSchema: {
           type: "object",
           properties: {
             collection: {
               type: "string",
-              description: "Name of the collection to aggregate"
+              description: "Name of the collection to aggregate",
             },
             pipeline: {
               type: "array",
-              description: "Aggregation pipeline stages"
-            }
+              description: "Aggregation pipeline stages",
+            },
+            explain: {
+              type: "string",
+              description:
+                "Optional: Get aggregation execution information (queryPlanner, executionStats, or allPlansExecution)",
+              enum: ["queryPlanner", "executionStats", "allPlansExecution"],
+            },
           },
-          required: ["collection", "pipeline"]
-        }
-      }
-    ]
+          required: ["collection", "pipeline"],
+        },
+      },
+      {
+        name: "update",
+        description: "Update documents in a MongoDB collection",
+        inputSchema: {
+          type: "object",
+          properties: {
+            collection: {
+              type: "string",
+              description: "Name of the collection to update",
+            },
+            filter: {
+              type: "object",
+              description: "Filter to select documents to update",
+            },
+            update: {
+              type: "object",
+              description:
+                "Update operations to apply ($set, $unset, $inc, etc.)",
+            },
+            upsert: {
+              type: "boolean",
+              description:
+                "Create a new document if no documents match the filter",
+            },
+            multi: {
+              type: "boolean",
+              description: "Update multiple documents that match the filter",
+            },
+          },
+          required: ["collection", "filter", "update"],
+        },
+      },
+      {
+        name: "serverInfo",
+        description:
+          "Get MongoDB server information including version, storage engine, and other details",
+        inputSchema: {
+          type: "object",
+          properties: {
+            includeDebugInfo: {
+              type: "boolean",
+              description:
+                "Include additional debug information about the server",
+            },
+          },
+        },
+      },
+      {
+        name: "insert",
+        description: "Insert one or more documents into a MongoDB collection",
+        inputSchema: {
+          type: "object",
+          properties: {
+            collection: {
+              type: "string",
+              description: "Name of the collection to insert into",
+            },
+            documents: {
+              type: "array",
+              description: "Array of documents to insert",
+              items: {
+                type: "object",
+              },
+            },
+            ordered: {
+              type: "boolean",
+              description:
+                "Optional: If true, perform an ordered insert of the documents. If false, perform an unordered insert",
+            },
+            writeConcern: {
+              type: "object",
+              description: "Optional: Write concern for the insert operation",
+            },
+            bypassDocumentValidation: {
+              type: "boolean",
+              description: "Optional: Allow insert to bypass schema validation",
+            },
+          },
+          required: ["collection", "documents"],
+        },
+      },
+      {
+        name: "createIndex",
+        description: "Create one or more indexes on a MongoDB collection",
+        inputSchema: {
+          type: "object",
+          properties: {
+            collection: {
+              type: "string",
+              description: "Name of the collection to create indexes on",
+            },
+            indexes: {
+              type: "array",
+              description: "Array of index specifications",
+              items: {
+                type: "object",
+                properties: {
+                  key: {
+                    type: "object",
+                    description:
+                      "Index key pattern, e.g. { field: 1 } for ascending, { field: -1 } for descending",
+                  },
+                  name: {
+                    type: "string",
+                    description: "Optional: Name of the index",
+                  },
+                  unique: {
+                    type: "boolean",
+                    description: "Optional: If true, creates a unique index",
+                  },
+                  sparse: {
+                    type: "boolean",
+                    description: "Optional: If true, creates a sparse index",
+                  },
+                  background: {
+                    type: "boolean",
+                    description:
+                      "Optional: If true, creates the index in the background",
+                  },
+                  expireAfterSeconds: {
+                    type: "number",
+                    description:
+                      "Optional: Specifies the TTL for documents (time to live)",
+                  },
+                  partialFilterExpression: {
+                    type: "object",
+                    description:
+                      "Optional: Filter expression for partial indexes",
+                  },
+                },
+                required: ["key"],
+              },
+            },
+            writeConcern: {
+              type: "object",
+              description: "Optional: Write concern for the index creation",
+            },
+            commitQuorum: {
+              type: ["string", "number"],
+              description:
+                "Optional: Number of voting members required to create index",
+            },
+          },
+          required: ["collection", "indexes"],
+        },
+      },
+      {
+        name: "count",
+        description:
+          "Count the number of documents in a collection that match a query",
+        inputSchema: {
+          type: "object",
+          properties: {
+            collection: {
+              type: "string",
+              description: "Name of the collection to count documents in",
+            },
+            query: {
+              type: "object",
+              description:
+                "Optional: Query filter to select documents to count",
+            },
+            limit: {
+              type: "integer",
+              description: "Optional: Maximum number of documents to count",
+            },
+            skip: {
+              type: "integer",
+              description:
+                "Optional: Number of documents to skip before counting",
+            },
+            hint: {
+              type: "object",
+              description: "Optional: Index hint to force query plan",
+            },
+            readConcern: {
+              type: "object",
+              description: "Optional: Read concern for the count operation",
+            },
+            maxTimeMS: {
+              type: "integer",
+              description: "Optional: Maximum time to allow the count to run",
+            },
+            collation: {
+              type: "object",
+              description: "Optional: Collation rules for string comparison",
+            },
+          },
+          required: ["collection"],
+        },
+      },
+    ],
   };
 });
 
@@ -205,77 +435,554 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
   switch (request.params.name) {
     case "query": {
-      const { filter, projection, limit } = request.params.arguments || {};
+      const { filter, projection, limit, explain } =
+        request.params.arguments || {};
 
       // Validate collection name to prevent access to system collections
-      if (collection.collectionName.startsWith('system.')) {
-        throw new Error('Access to system collections is not allowed');
+      if (collection.collectionName.startsWith("system.")) {
+        throw new Error("Access to system collections is not allowed");
       }
 
       // Validate and parse filter
       let queryFilter = {};
       if (filter) {
-        if (typeof filter === 'string') {
+        if (typeof filter === "string") {
           try {
             queryFilter = JSON.parse(filter);
           } catch (e) {
-            throw new Error('Invalid filter format: must be a valid JSON object');
+            throw new Error(
+              "Invalid filter format: must be a valid JSON object",
+            );
           }
-        } else if (typeof filter === 'object' && filter !== null && !Array.isArray(filter)) {
+        } else if (
+          typeof filter === "object" &&
+          filter !== null &&
+          !Array.isArray(filter)
+        ) {
           queryFilter = filter;
         } else {
-          throw new Error('Query filter must be a plain object or ObjectId');
+          throw new Error("Query filter must be a plain object or ObjectId");
         }
       }
 
       // Execute the find operation with error handling
       try {
-        const cursor = collection.find(queryFilter, {
-          projection,
-          limit: limit || 100
-        });
-        const results = await cursor.toArray();
+        if (explain) {
+          // Use explain for query analysis
+          const explainResult = await collection
+            .find(queryFilter, {
+              projection,
+              limit: limit || 100,
+            })
+            .explain(explain);
 
-        return {
-          content: [{
-            type: "text",
-            text: JSON.stringify(results, null, 2)
-          }]
-        };
+          return {
+            content: [
+              {
+                type: "text",
+                text: JSON.stringify(explainResult, null, 2),
+              },
+            ],
+          };
+        } else {
+          // Regular query execution
+          const cursor = collection.find(queryFilter, {
+            projection,
+            limit: limit || 100,
+          });
+          const results = await cursor.toArray();
+
+          return {
+            content: [
+              {
+                type: "text",
+                text: JSON.stringify(results, null, 2),
+              },
+            ],
+          };
+        }
       } catch (error) {
         if (error instanceof Error) {
-          throw new Error(`Failed to query collection ${collection.collectionName}: ${error.message}`);
+          throw new Error(
+            `Failed to query collection ${collection.collectionName}: ${error.message}`,
+          );
         }
-        throw new Error(`Failed to query collection ${collection.collectionName}: Unknown error`);
+        throw new Error(
+          `Failed to query collection ${collection.collectionName}: Unknown error`,
+        );
       }
     }
 
     case "aggregate": {
-      const { pipeline } = request.params.arguments || {};
+      const { pipeline, explain } = request.params.arguments || {};
       if (!Array.isArray(pipeline)) {
         throw new Error("Pipeline must be an array");
       }
 
       // Validate collection name to prevent access to system collections
-      if (collection.collectionName.startsWith('system.')) {
-        throw new Error('Access to system collections is not allowed');
+      if (collection.collectionName.startsWith("system.")) {
+        throw new Error("Access to system collections is not allowed");
       }
 
       // Execute the aggregation operation with error handling
       try {
-        const results = await collection.aggregate(pipeline).toArray();
+        if (explain) {
+          // Use explain for aggregation analysis
+          const explainResult = await collection
+            .aggregate(pipeline, {
+              explain: {
+                verbosity: explain,
+              },
+            })
+            .toArray();
+
+          return {
+            content: [
+              {
+                type: "text",
+                text: JSON.stringify(explainResult, null, 2),
+              },
+            ],
+          };
+        } else {
+          // Regular aggregation execution
+          const results = await collection.aggregate(pipeline).toArray();
+
+          return {
+            content: [
+              {
+                type: "text",
+                text: JSON.stringify(results, null, 2),
+              },
+            ],
+          };
+        }
+      } catch (error) {
+        if (error instanceof Error) {
+          throw new Error(
+            `Failed to aggregate collection ${collection.collectionName}: ${error.message}`,
+          );
+        }
+        throw new Error(
+          `Failed to aggregate collection ${collection.collectionName}: Unknown error`,
+        );
+      }
+    }
+
+    case "update": {
+      const { filter, update, upsert, multi } = request.params.arguments || {};
+
+      // Validate collection name to prevent access to system collections
+      if (collection.collectionName.startsWith("system.")) {
+        throw new Error("Access to system collections is not allowed");
+      }
+
+      // Validate and parse filter
+      let queryFilter = {};
+      if (filter) {
+        if (typeof filter === "string") {
+          try {
+            queryFilter = JSON.parse(filter);
+          } catch (e) {
+            throw new Error(
+              "Invalid filter format: must be a valid JSON object",
+            );
+          }
+        } else if (
+          typeof filter === "object" &&
+          filter !== null &&
+          !Array.isArray(filter)
+        ) {
+          queryFilter = filter;
+        } else {
+          throw new Error("Query filter must be a plain object or ObjectId");
+        }
+      }
+
+      // Validate update operations
+      if (!update || typeof update !== "object" || Array.isArray(update)) {
+        throw new Error("Update must be a valid MongoDB update document");
+      }
+
+      // Check if update operations use valid operators
+      const validUpdateOperators = [
+        "$set",
+        "$unset",
+        "$inc",
+        "$push",
+        "$pull",
+        "$addToSet",
+        "$pop",
+        "$rename",
+        "$mul",
+      ];
+      const hasValidOperator = Object.keys(update).some((key) =>
+        validUpdateOperators.includes(key),
+      );
+      if (!hasValidOperator) {
+        throw new Error(
+          "Update must include at least one valid update operator ($set, $unset, etc.)",
+        );
+      }
+
+      try {
+        const options = {
+          upsert: !!upsert,
+          multi: !!multi,
+        };
+
+        // Use updateOne or updateMany based on multi option
+        const updateMethod = options.multi ? "updateMany" : "updateOne";
+        const result = await collection[updateMethod](
+          queryFilter,
+          update,
+          options,
+        );
 
         return {
-          content: [{
-            type: "text",
-            text: JSON.stringify(results, null, 2)
-          }]
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify(
+                {
+                  matchedCount: result.matchedCount,
+                  modifiedCount: result.modifiedCount,
+                  upsertedCount: result.upsertedCount,
+                  upsertedId: result.upsertedId,
+                },
+                null,
+                2,
+              ),
+            },
+          ],
         };
       } catch (error) {
         if (error instanceof Error) {
-          throw new Error(`Failed to aggregate collection ${collection.collectionName}: ${error.message}`);
+          throw new Error(
+            `Failed to update collection ${collection.collectionName}: ${error.message}`,
+          );
         }
-        throw new Error(`Failed to aggregate collection ${collection.collectionName}: Unknown error`);
+        throw new Error(
+          `Failed to update collection ${collection.collectionName}: Unknown error`,
+        );
+      }
+    }
+
+    case "serverInfo": {
+      const { includeDebugInfo } = request.params.arguments || {};
+
+      try {
+        // Get basic server information using buildInfo command
+        const buildInfo = await db.command({ buildInfo: 1 });
+
+        // Get additional server status if debug info is requested
+        let serverStatus = null;
+        if (includeDebugInfo) {
+          serverStatus = await db.command({ serverStatus: 1 });
+        }
+
+        // Construct the response
+        const serverInfo = {
+          version: buildInfo.version,
+          gitVersion: buildInfo.gitVersion,
+          modules: buildInfo.modules,
+          allocator: buildInfo.allocator,
+          javascriptEngine: buildInfo.javascriptEngine,
+          sysInfo: buildInfo.sysInfo,
+          storageEngines: buildInfo.storageEngines,
+          debug: buildInfo.debug,
+          maxBsonObjectSize: buildInfo.maxBsonObjectSize,
+          openssl: buildInfo.openssl,
+          buildEnvironment: buildInfo.buildEnvironment,
+          bits: buildInfo.bits,
+          ok: buildInfo.ok,
+          status: {},
+        };
+
+        // Add server status information if requested
+        if (serverStatus) {
+          serverInfo.status = {
+            host: serverStatus.host,
+            version: serverStatus.version,
+            process: serverStatus.process,
+            pid: serverStatus.pid,
+            uptime: serverStatus.uptime,
+            uptimeMillis: serverStatus.uptimeMillis,
+            uptimeEstimate: serverStatus.uptimeEstimate,
+            localTime: serverStatus.localTime,
+            connections: serverStatus.connections,
+            network: serverStatus.network,
+            memory: serverStatus.mem,
+            storageEngine: serverStatus.storageEngine,
+            security: serverStatus.security,
+          };
+        }
+
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify(serverInfo, null, 2),
+            },
+          ],
+        };
+      } catch (error) {
+        if (error instanceof Error) {
+          throw new Error(`Failed to get server information: ${error.message}`);
+        }
+        throw new Error("Failed to get server information: Unknown error");
+      }
+    }
+
+    case "insert": {
+      const { documents, ordered, writeConcern, bypassDocumentValidation } =
+        request.params.arguments || {};
+
+      // Validate collection name to prevent access to system collections
+      if (collection.collectionName.startsWith("system.")) {
+        throw new Error("Access to system collections is not allowed");
+      }
+
+      // Validate documents array
+      if (!Array.isArray(documents)) {
+        throw new Error("Documents must be an array");
+      }
+      if (documents.length === 0) {
+        throw new Error("Documents array cannot be empty");
+      }
+      if (
+        !documents.every(
+          (doc) => doc && typeof doc === "object" && !Array.isArray(doc),
+        )
+      ) {
+        throw new Error(
+          "Each document must be a valid MongoDB document object",
+        );
+      }
+
+      try {
+        // Prepare insert options
+        const options = {
+          ordered: ordered !== false, // default to true if not specified
+          writeConcern,
+          bypassDocumentValidation,
+        };
+
+        // Use insertMany for consistency, it works for single documents too
+        const result = await collection.insertMany(documents, options);
+
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify(
+                {
+                  acknowledged: result.acknowledged,
+                  insertedCount: result.insertedCount,
+                  insertedIds: result.insertedIds,
+                },
+                null,
+                2,
+              ),
+            },
+          ],
+        };
+      } catch (error) {
+        if (error instanceof Error) {
+          // Handle bulk write errors specially to provide more detail
+          if (error.name === "BulkWriteError") {
+            const bulkError = error as any;
+            return {
+              content: [
+                {
+                  type: "text",
+                  text: JSON.stringify(
+                    {
+                      error: "Bulk write error occurred",
+                      writeErrors: bulkError.writeErrors,
+                      insertedCount: bulkError.result?.nInserted || 0,
+                      failedCount: bulkError.result?.nFailedInserts || 0,
+                    },
+                    null,
+                    2,
+                  ),
+                },
+              ],
+            };
+          }
+          throw new Error(
+            `Failed to insert documents into collection ${collection.collectionName}: ${error.message}`,
+          );
+        }
+        throw new Error(
+          `Failed to insert documents into collection ${collection.collectionName}: Unknown error`,
+        );
+      }
+    }
+
+    case "createIndex": {
+      const { indexes, writeConcern, commitQuorum } =
+        request.params.arguments || {};
+
+      // Validate collection name to prevent access to system collections
+      if (collection.collectionName.startsWith("system.")) {
+        throw new Error("Access to system collections is not allowed");
+      }
+
+      // Validate indexes array
+      if (!Array.isArray(indexes) || indexes.length === 0) {
+        throw new Error("Indexes must be a non-empty array");
+      }
+
+      // Validate writeConcern
+      if (
+        writeConcern &&
+        (typeof writeConcern !== "object" || Array.isArray(writeConcern))
+      ) {
+        throw new Error(
+          "Write concern must be a valid MongoDB write concern object",
+        );
+      }
+
+      // Validate commitQuorum
+      if (
+        commitQuorum &&
+        typeof commitQuorum !== "string" &&
+        typeof commitQuorum !== "number"
+      ) {
+        throw new Error("Commit quorum must be a string or number");
+      }
+
+      try {
+        const result = await collection.createIndexes(indexes, {
+          writeConcern,
+          commitQuorum:
+            typeof commitQuorum === "number" ? commitQuorum : undefined,
+        });
+
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify(
+                {
+                  acknowledged: result.acknowledged,
+                  createdIndexes: result.createdIndexes,
+                  numIndexesBefore: result.numIndexesBefore,
+                  numIndexesAfter: result.numIndexesAfter,
+                },
+                null,
+                2,
+              ),
+            },
+          ],
+        };
+      } catch (error) {
+        if (error instanceof Error) {
+          throw new Error(
+            `Failed to create indexes on collection ${collection.collectionName}: ${error.message}`,
+          );
+        }
+        throw new Error(
+          `Failed to create indexes on collection ${collection.collectionName}: Unknown error`,
+        );
+      }
+    }
+
+    case "count": {
+      const args = request.params.arguments || {};
+      const { query } = args;
+
+      // Validate collection name to prevent access to system collections
+      if (collection.collectionName.startsWith("system.")) {
+        throw new Error("Access to system collections is not allowed");
+      }
+
+      // Validate and parse query
+      let countQuery = {};
+      if (query) {
+        if (typeof query === "string") {
+          try {
+            countQuery = JSON.parse(query);
+          } catch (e) {
+            throw new Error(
+              "Invalid query format: must be a valid JSON object",
+            );
+          }
+        } else if (
+          typeof query === "object" &&
+          query !== null &&
+          !Array.isArray(query)
+        ) {
+          countQuery = query;
+        } else {
+          throw new Error("Query must be a plain object");
+        }
+      }
+
+      try {
+        // Prepare count options with proper typing
+        interface CountOptions {
+          limit?: number;
+          skip?: number;
+          hint?: object;
+          readConcern?: object;
+          maxTimeMS?: number;
+          collation?: object;
+          [key: string]: any;
+        }
+
+        const options: CountOptions = {
+          limit: typeof args.limit === "number" ? args.limit : undefined,
+          skip: typeof args.skip === "number" ? args.skip : undefined,
+          hint:
+            typeof args.hint === "object" && args.hint !== null
+              ? args.hint
+              : undefined,
+          readConcern:
+            typeof args.readConcern === "object" && args.readConcern !== null
+              ? args.readConcern
+              : undefined,
+          maxTimeMS:
+            typeof args.maxTimeMS === "number" ? args.maxTimeMS : undefined,
+          collation:
+            typeof args.collation === "object" && args.collation !== null
+              ? args.collation
+              : undefined,
+        };
+
+        // Remove undefined options
+        Object.keys(options).forEach(
+          (key) => options[key] === undefined && delete options[key],
+        );
+
+        // Execute count operation
+        const count = await collection.countDocuments(countQuery, options);
+
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify(
+                {
+                  count: count,
+                  ok: 1,
+                },
+                null,
+                2,
+              ),
+            },
+          ],
+        };
+      } catch (error) {
+        if (error instanceof Error) {
+          throw new Error(
+            `Failed to count documents in collection ${collection.collectionName}: ${error.message}`,
+          );
+        }
+        throw new Error(
+          `Failed to count documents in collection ${collection.collectionName}: Unknown error`,
+        );
       }
     }
 
@@ -298,11 +1005,11 @@ server.setRequestHandler(ListPromptsRequestSchema, async () => {
           {
             name: "collection",
             description: "Name of the collection to analyze",
-            required: true
-          }
-        ]
-      }
-    ]
+            required: true,
+          },
+        ],
+      },
+    ],
   };
 });
 
@@ -324,25 +1031,25 @@ server.setRequestHandler(GetPromptRequestSchema, async (request) => {
     const collection = db.collection(collectionName);
 
     // Validate collection name to prevent access to system collections
-    if (collection.collectionName.startsWith('system.')) {
-      throw new Error('Access to system collections is not allowed');
+    if (collection.collectionName.startsWith("system.")) {
+      throw new Error("Access to system collections is not allowed");
     }
 
     const schema = await collection.findOne({});
 
     // Get basic collection stats - just count in API v1
-    const stats = await collection.aggregate([
-      {
-        $collStats: {
-          count: {}
-        }
-      }
-    ]).toArray();
+    const stats = await collection
+      .aggregate([
+        {
+          $collStats: {
+            count: {},
+          },
+        },
+      ])
+      .toArray();
 
     // Also get a sample of documents to show data distribution
-    const sampleDocs = await collection.find({})
-      .limit(5)
-      .toArray();
+    const sampleDocs = await collection.find({}).limit(5).toArray();
 
     return {
       messages: [
@@ -357,26 +1064,30 @@ Schema:
 ${JSON.stringify(schema, null, 2)}
 
 Stats:
-Document count: ${stats[0]?.count || 'unknown'}
+Document count: ${stats[0]?.count || "unknown"}
 
 Sample documents:
-${JSON.stringify(sampleDocs, null, 2)}`
-          }
+${JSON.stringify(sampleDocs, null, 2)}`,
+          },
         },
         {
           role: "user",
           content: {
             type: "text",
-            text: "Provide insights about the collection's structure, data types, and basic statistics."
-          }
-        }
-      ]
+            text: "Provide insights about the collection's structure, data types, and basic statistics.",
+          },
+        },
+      ],
     };
   } catch (error) {
     if (error instanceof Error) {
-      throw new Error(`Failed to analyze collection ${collectionName}: ${error.message}`);
+      throw new Error(
+        `Failed to analyze collection ${collectionName}: ${error.message}`,
+      );
     } else {
-      throw new Error(`Failed to analyze collection ${collectionName}: Unknown error`);
+      throw new Error(
+        `Failed to analyze collection ${collectionName}: Unknown error`,
+      );
     }
   }
 });
@@ -413,9 +1124,9 @@ Example queries:
 3. Find documents with existing email:
 { "email": { "$exists": true } }
 
-Use these patterns to construct MongoDB queries.`
-      }
-    ]
+Use these patterns to construct MongoDB queries.`,
+      },
+    ],
   };
 });
 
@@ -425,7 +1136,9 @@ Use these patterns to construct MongoDB queries.`
 async function main() {
   const args = process.argv.slice(2);
   if (args.length === 0) {
-    console.error("Please provide a MongoDB connection URL as a command-line argument");
+    console.error(
+      "Please provide a MongoDB connection URL as a command-line argument",
+    );
     process.exit(1);
   }
 

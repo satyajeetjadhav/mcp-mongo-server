@@ -5,7 +5,7 @@
 ![NPM License](https://img.shields.io/npm/l/mcp-mongo-server)
 [![smithery badge](https://smithery.ai/badge/mcp-mongo-server)](https://smithery.ai/server/mcp-mongo-server)
 
-A Model Context Protocol server that provides access to MongoDB databases. This server enables LLMs to inspect collection schemas and execute read-only queries.
+A Model Context Protocol server that provides access to MongoDB databases. This server enables LLMs to inspect collection schemas and execute MongoDB operations.
 
 ## Demo
 
@@ -20,23 +20,44 @@ A Model Context Protocol server that provides access to MongoDB databases. This 
 
 ### Tools
 - **query**
-  - Execute read-only MongoDB queries against the connected database
-  - Input: `query` (object): The MongoDB query to execute
-  - All queries are executed with read-only permissions
+  - Execute MongoDB queries with optional execution plan analysis
+  - Input: Collection name, filter, projection, limit, explain options
+  - Returns query results or execution plan
 
 - **aggregate**
-  - Execute read-only MongoDB queries against the connected database
-  - Input: `aggregate` (object): The MongoDB query to execute
-  - All queries are executed with read-only permissions
+  - Execute MongoDB aggregation pipelines with optional execution plan analysis
+  - Input: Collection name, pipeline stages, explain options
+  - Returns aggregation results or execution plan
+
+- **update**
+  - Update documents in a collection
+  - Input: Collection name, filter, update operations, upsert/multi options
+  - Returns update operation results
+
+- **serverInfo**
+  - Get MongoDB server information and status
+  - Input: Optional debug info flag
+  - Returns version, storage engine, and server details
+
+- **insert**
+  - Insert documents into a collection
+  - Input: Collection name, documents array, write options
+  - Returns insert operation results
+
+- **createIndex**
+  - Create indexes on a collection
+  - Input: Collection name, index specifications, write options
+  - Returns index creation results
+
+- **count**
+  - Count documents matching a query
+  - Input: Collection name, query filter, count options
+  - Returns document count
 
 ### Prompts
-- `query` - Provide insights about the collection's structure, data types, and basic statistics
-  - Input: `collection` (string): The name of the collection to analyze
-  - Output: `text` (string): A summary of the collection's structure, data types, and basic statistics
-- `aggregate` - Provide insights about the collection's structure, data types, and basic statistics
-  - Input: `collection` (string): The name of the collection to analyze
-  - Output: `text` (string): A summary of the collection's structure, data types, and basic statistics
-
+- `analyze_collection` - Analyze collection structure and contents
+  - Input: Collection name
+  - Output: Insights about schema, data types, and statistics
 
 
 ## Development
