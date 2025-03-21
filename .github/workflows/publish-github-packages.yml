@@ -5,6 +5,8 @@ on:
     types: [created]
   pull_request:
     branches: [main]
+  push:
+    branches: [main]
   workflow_dispatch:
 
 jobs:
@@ -42,6 +44,8 @@ jobs:
         run: |
           if [[ "${{ github.event_name }}" == "release" ]]; then
             VERSION="${{ github.event.release.tag_name }}"
+          elif [[ "${{ github.event_name }}" == "push" && "${{ github.ref }}" == "refs/heads/main" ]]; then
+            VERSION="${STATIC_VERSION}-main.${BUILD_ID}"
           else
             VERSION="${STATIC_VERSION}-build.${BUILD_ID}"
           fi
