@@ -3,6 +3,8 @@ name: Publish @kiliczsh/mcp-mongo-server
 on:
   release:
     types: [created]
+  pull_request:
+    branches: [main]
   workflow_dispatch:
 
 jobs:
@@ -13,7 +15,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-      - run: npm ci
+      - name: Install dependencies
+        run: npm ci
 
   publish-gpr:
     needs: build
@@ -33,7 +36,8 @@ jobs:
         with:
           node-version: 20
           registry-url: https://npm.pkg.github.com/
-      - run: cp .npmrc-github .npmrc
+      - name: Copy GitHub NPM configuration
+        run: cp .npmrc-github .npmrc
       - name: Determine Version
         run: |
           if [[ "${{ github.event_name }}" == "release" ]]; then
@@ -57,7 +61,9 @@ jobs:
 
           jq -s '.[0] * {publishConfig: .[1]}' package.json publishConfig.json > package.tmp.json && mv package.tmp.json package.json
 
-      - run: npm ci
-      - run: npm publish --registry=https://npm.pkg.github.com
+      - name: Install dependencies
+        run: npm ci
+      - name: Publish package to GitHub Packages
+        run: npm publish --registry=https://npm.pkg.github.com
         env:
           NODE_AUTH_TOKEN: ${{secrets.NODE_AUTH_TOKEN}}
