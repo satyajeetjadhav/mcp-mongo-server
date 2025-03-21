@@ -37,7 +37,7 @@ let db: any = null;
 const server = new Server(
   {
     name: "mongodb",
-    version: "1.0.0",
+    version: "1.1.0",
   },
   {
     capabilities: {
