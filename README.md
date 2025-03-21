@@ -162,6 +162,15 @@ To use this server with the Claude Desktop app, add the following configuration 
         "mongodb://muhammed:kilic@mongodb.localhost/sample_namespace",
         "--read-only"
       ]
+    },
+    "mongodb-github": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "github:kiliczsh/mcp-mongo-server",
+        "mongodb://muhammed:kilic@mongodb.localhost/sample_namespace",
+        "--read-only"
+      ]
     }
   }
 }

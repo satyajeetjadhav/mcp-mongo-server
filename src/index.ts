@@ -41,7 +41,7 @@ let isReadOnlyMode = false;
 const server = new Server(
   {
     name: "mongodb",
-    version: "1.1.0",
+    version: "1.1.1",
   },
   {
     capabilities: {
