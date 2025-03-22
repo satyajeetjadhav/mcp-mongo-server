@@ -41,7 +41,7 @@ let isReadOnlyMode = false;
 const server = new Server(
   {
     name: "mongodb",
-    version: "1.1.1",
+    version: "1.1.2",
   },
   {
     capabilities: {
@@ -57,7 +57,9 @@ const server = new Server(
  */
 async function connectToMongoDB(url: string, readOnly: boolean = false) {
   try {
-    const options = readOnly ? { readPreference: ReadPreference.SECONDARY } : {};
+    const options = readOnly
+      ? { readPreference: ReadPreference.SECONDARY }
+      : {};
     client = new MongoClient(url, options);
     await client.connect();
     db = client.db();
@@ -83,7 +85,7 @@ server.setRequestHandler(PingRequestSchema, async () => {
     await db.command({ ping: 1 });
 
     return {
-      readOnlyMode: isReadOnlyMode
+      readOnlyMode: isReadOnlyMode,
     };
   } catch (error) {
     if (error instanceof Error) {
@@ -438,14 +440,15 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
           properties: {
             nameOnly: {
               type: "boolean",
-              description: "Optional: If true, returns only the collection names instead of full collection info"
+              description:
+                "Optional: If true, returns only the collection names instead of full collection info",
             },
             filter: {
-              type: "object", 
-              description: "Optional: Filter to apply to the collections"
-            }
-          }
-        }
+              type: "object",
+              description: "Optional: Filter to apply to the collections",
+            },
+          },
+        },
       },
     ],
   };
@@ -457,13 +460,15 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
  */
 server.setRequestHandler(CallToolRequestSchema, async (request) => {
   const collection = db.collection(request.params.arguments?.collection);
-  
+
   // Define write operations that should be blocked in read-only mode
-  const writeOperations = ['update', 'insert', 'createIndex'];
-  
+  const writeOperations = ["update", "insert", "createIndex"];
+
   // Check if the operation is a write operation and we're in read-only mode
   if (isReadOnlyMode && writeOperations.includes(request.params.name)) {
-    throw new Error(`ReadonlyError: Operation '${request.params.name}' is not allowed in read-only mode`);
+    throw new Error(
+      `ReadonlyError: Operation '${request.params.name}' is not allowed in read-only mode`,
+    );
   }
 
   switch (request.params.name) {
@@ -732,8 +737,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           status: {},
           connectionInfo: {
             readOnlyMode: isReadOnlyMode,
-            readPreference: isReadOnlyMode ? 'secondary' : 'primary'
-          }
+            readPreference: isReadOnlyMode ? "secondary" : "primary",
+          },
         };
 
         // Add server status information if requested
@@ -1025,17 +1030,17 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
     case "listCollections": {
       const { nameOnly, filter } = request.params.arguments || {};
-      
+
       try {
         // Get the list of collections
         const options = filter ? { filter } : {};
         const collections = await db.listCollections(options).toArray();
-        
+
         // If nameOnly is true, return only the collection names
         const result = nameOnly
           ? collections.map((collection: any) => collection.name)
           : collections;
-        
+
         return {
           content: [
             {
@@ -1201,21 +1206,21 @@ Use these patterns to construct MongoDB queries.`,
  */
 async function main() {
   const args = process.argv.slice(2);
-  let connectionUrl = '';
+  let connectionUrl = "";
   let readOnlyMode = false;
-  
+
   // Parse command line arguments
   for (let i = 0; i < args.length; i++) {
-    if (args[i] === '--read-only' || args[i] === '-r') {
+    if (args[i] === "--read-only" || args[i] === "-r") {
       readOnlyMode = true;
     } else if (!connectionUrl) {
       connectionUrl = args[i];
     }
   }
-  
+
   if (!connectionUrl) {
     console.error(
-      "Please provide a MongoDB connection URL as a command-line argument"
+      "Please provide a MongoDB connection URL as a command-line argument",
     );
     console.error("Usage: command <mongodb-url> [--read-only|-r]");
     process.exit(1);
