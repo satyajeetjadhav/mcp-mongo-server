@@ -213,7 +213,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
               enum: ["queryPlanner", "executionStats", "allPlansExecution"],
             },
           },
-          required: ["collection"],
+          required: ["collection", "filter", "projection", "limit", "explain"],
         },
       },
       {
