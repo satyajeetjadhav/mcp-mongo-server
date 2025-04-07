@@ -49,7 +49,7 @@ const server = new Server(
       tools: {},
       prompts: {},
     },
-  },
+  }
 );
 
 /**
@@ -167,11 +167,11 @@ server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
   } catch (error) {
     if (error instanceof Error) {
       throw new Error(
-        `Failed to read collection ${collectionName}: ${error.message}`,
+        `Failed to read collection ${collectionName}: ${error.message}`
       );
     }
     throw new Error(
-      `Failed to read collection ${collectionName}: Unknown error`,
+      `Failed to read collection ${collectionName}: Unknown error`
     );
   }
 });
@@ -230,11 +230,13 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             pipeline: {
               type: "array",
               description: "Aggregation pipeline stages",
+              items: {
+                type: "object",
+              },
             },
             explain: {
               type: "string",
-              description:
-                "Optional: Get aggregation execution information (queryPlanner, executionStats, or allPlansExecution)",
+              description: "Optional: Get aggregation execution information",
               enum: ["queryPlanner", "executionStats", "allPlansExecution"],
             },
           },
@@ -467,7 +469,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   // Check if the operation is a write operation and we're in read-only mode
   if (isReadOnlyMode && writeOperations.includes(request.params.name)) {
     throw new Error(
-      `ReadonlyError: Operation '${request.params.name}' is not allowed in read-only mode`,
+      `ReadonlyError: Operation '${request.params.name}' is not allowed in read-only mode`
     );
   }
 
@@ -489,7 +491,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             queryFilter = JSON.parse(filter);
           } catch (e) {
             throw new Error(
-              "Invalid filter format: must be a valid JSON object",
+              "Invalid filter format: must be a valid JSON object"
             );
           }
         } else if (
@@ -542,11 +544,11 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       } catch (error) {
         if (error instanceof Error) {
           throw new Error(
-            `Failed to query collection ${collection.collectionName}: ${error.message}`,
+            `Failed to query collection ${collection.collectionName}: ${error.message}`
           );
         }
         throw new Error(
-          `Failed to query collection ${collection.collectionName}: Unknown error`,
+          `Failed to query collection ${collection.collectionName}: Unknown error`
         );
       }
     }
@@ -598,11 +600,11 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       } catch (error) {
         if (error instanceof Error) {
           throw new Error(
-            `Failed to aggregate collection ${collection.collectionName}: ${error.message}`,
+            `Failed to aggregate collection ${collection.collectionName}: ${error.message}`
           );
         }
         throw new Error(
-          `Failed to aggregate collection ${collection.collectionName}: Unknown error`,
+          `Failed to aggregate collection ${collection.collectionName}: Unknown error`
         );
       }
     }
@@ -623,7 +625,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             queryFilter = JSON.parse(filter);
           } catch (e) {
             throw new Error(
-              "Invalid filter format: must be a valid JSON object",
+              "Invalid filter format: must be a valid JSON object"
             );
           }
         } else if (
@@ -655,11 +657,11 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         "$mul",
       ];
       const hasValidOperator = Object.keys(update).some((key) =>
-        validUpdateOperators.includes(key),
+        validUpdateOperators.includes(key)
       );
       if (!hasValidOperator) {
         throw new Error(
-          "Update must include at least one valid update operator ($set, $unset, etc.)",
+          "Update must include at least one valid update operator ($set, $unset, etc.)"
         );
       }
 
@@ -674,7 +676,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         const result = await collection[updateMethod](
           queryFilter,
           update,
-          options,
+          options
         );
 
         return {
@@ -689,7 +691,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                   upsertedId: result.upsertedId,
                 },
                 null,
-                2,
+                2
               ),
             },
           ],
@@ -697,11 +699,11 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       } catch (error) {
         if (error instanceof Error) {
           throw new Error(
-            `Failed to update collection ${collection.collectionName}: ${error.message}`,
+            `Failed to update collection ${collection.collectionName}: ${error.message}`
           );
         }
         throw new Error(
-          `Failed to update collection ${collection.collectionName}: Unknown error`,
+          `Failed to update collection ${collection.collectionName}: Unknown error`
         );
       }
     }
@@ -794,11 +796,11 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
       if (
         !documents.every(
-          (doc) => doc && typeof doc === "object" && !Array.isArray(doc),
+          (doc) => doc && typeof doc === "object" && !Array.isArray(doc)
         )
       ) {
         throw new Error(
-          "Each document must be a valid MongoDB document object",
+          "Each document must be a valid MongoDB document object"
         );
       }
 
@@ -824,7 +826,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                   insertedIds: result.insertedIds,
                 },
                 null,
-                2,
+                2
               ),
             },
           ],
@@ -846,18 +848,18 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                       failedCount: bulkError.result?.nFailedInserts || 0,
                     },
                     null,
-                    2,
+                    2
                   ),
                 },
               ],
             };
           }
           throw new Error(
-            `Failed to insert documents into collection ${collection.collectionName}: ${error.message}`,
+            `Failed to insert documents into collection ${collection.collectionName}: ${error.message}`
           );
         }
         throw new Error(
-          `Failed to insert documents into collection ${collection.collectionName}: Unknown error`,
+          `Failed to insert documents into collection ${collection.collectionName}: Unknown error`
         );
       }
     }
@@ -882,7 +884,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         (typeof writeConcern !== "object" || Array.isArray(writeConcern))
       ) {
         throw new Error(
-          "Write concern must be a valid MongoDB write concern object",
+          "Write concern must be a valid MongoDB write concern object"
         );
       }
 
@@ -914,7 +916,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                   numIndexesAfter: result.numIndexesAfter,
                 },
                 null,
-                2,
+                2
               ),
             },
           ],
@@ -922,11 +924,11 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       } catch (error) {
         if (error instanceof Error) {
           throw new Error(
-            `Failed to create indexes on collection ${collection.collectionName}: ${error.message}`,
+            `Failed to create indexes on collection ${collection.collectionName}: ${error.message}`
           );
         }
         throw new Error(
-          `Failed to create indexes on collection ${collection.collectionName}: Unknown error`,
+          `Failed to create indexes on collection ${collection.collectionName}: Unknown error`
         );
       }
     }
@@ -948,7 +950,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             countQuery = JSON.parse(query);
           } catch (e) {
             throw new Error(
-              "Invalid query format: must be a valid JSON object",
+              "Invalid query format: must be a valid JSON object"
             );
           }
         } else if (
@@ -995,7 +997,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
         // Remove undefined options
         Object.keys(options).forEach(
-          (key) => options[key] === undefined && delete options[key],
+          (key) => options[key] === undefined && delete options[key]
         );
 
         // Execute count operation
@@ -1011,7 +1013,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                   ok: 1,
                 },
                 null,
-                2,
+                2
               ),
             },
           ],
@@ -1019,11 +1021,11 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       } catch (error) {
         if (error instanceof Error) {
           throw new Error(
-            `Failed to count documents in collection ${collection.collectionName}: ${error.message}`,
+            `Failed to count documents in collection ${collection.collectionName}: ${error.message}`
           );
         }
         throw new Error(
-          `Failed to count documents in collection ${collection.collectionName}: Unknown error`,
+          `Failed to count documents in collection ${collection.collectionName}: Unknown error`
         );
       }
     }
@@ -1153,11 +1155,11 @@ ${JSON.stringify(sampleDocs, null, 2)}`,
   } catch (error) {
     if (error instanceof Error) {
       throw new Error(
-        `Failed to analyze collection ${collectionName}: ${error.message}`,
+        `Failed to analyze collection ${collectionName}: ${error.message}`
       );
     } else {
       throw new Error(
-        `Failed to analyze collection ${collectionName}: Unknown error`,
+        `Failed to analyze collection ${collectionName}: Unknown error`
       );
     }
   }
@@ -1220,7 +1222,7 @@ async function main() {
 
   if (!connectionUrl) {
     console.error(
-      "Please provide a MongoDB connection URL as a command-line argument",
+      "Please provide a MongoDB connection URL as a command-line argument"
     );
     console.error("Usage: command <mongodb-url> [--read-only|-r]");
     process.exit(1);
