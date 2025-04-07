@@ -185,23 +185,60 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
     tools: [
       {
         name: "query",
-        description:
-          "Execute a MongoDB query with optional execution plan analysis",
+        description: "Function that returns the actual MongoDB query",
         strict: true,
         inputSchema: {
           type: "object",
           properties: {
             collection: {
               type: "string",
-              description: "Name of the collection to query",
+              description: "Name of the MongoDB collection to query",
             },
             filter: {
               type: "object",
-              description: "MongoDB query filter",
+              description: "Filter conditions to apply to the query",
+              properties: {
+                field: {
+                  type: "string",
+                  description: "Field name to filter on",
+                },
+                value: {
+                  type: "string",
+                  description: "Value to match in the filter condition",
+                },
+                operator: {
+                  type: "string",
+                  description:
+                    "Operator to use in the filter (e.g., '$eq', '$gt', etc.)",
+                },
+              },
+              additionalProperties: false,
+              required: ["field", "value", "operator"],
             },
             projection: {
               type: "object",
-              description: "Fields to include/exclude",
+              description:
+                "Fields to include or exclude in the returned documents",
+              properties: {
+                include: {
+                  type: "array",
+                  description: "Fields to include in the result",
+                  items: {
+                    type: "string",
+                    description: "Field name to include",
+                  },
+                },
+                exclude: {
+                  type: "array",
+                  description: "Fields to exclude from the result",
+                  items: {
+                    type: "string",
+                    description: "Field name to exclude",
+                  },
+                },
+              },
+              additionalProperties: false,
+              required: ["include", "exclude"],
             },
             limit: {
               type: "number",
@@ -457,8 +494,6 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
  * Executes queries and returns results.
  */
 server.setRequestHandler(CallToolRequestSchema, async (request) => {
-  const collection = db.collection(request.params.arguments?.collection);
-
   // Define write operations that should be blocked in read-only mode
   const writeOperations = ["update", "insert", "createIndex"];
 
@@ -471,11 +506,11 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
   switch (request.params.name) {
     case "query": {
-      const { filter, projection, limit, explain } =
+      const { filter, projection, limit, collection } =
         request.params.arguments || {};
 
       // Validate collection name to prevent access to system collections
-      if (collection.collectionName.startsWith("system.")) {
+      if (typeof collection === "string" && collection.startsWith("system.")) {
         throw new Error("Access to system collections is not allowed");
       }
 
@@ -503,40 +538,21 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
       // Execute the find operation with error handling
       try {
-        if (explain) {
-          // Use explain for query analysis
-          const explainResult = await collection
-            .find(queryFilter, {
-              projection,
-              limit: limit || 100,
-            })
-            .explain(explain);
+        // Regular query execution
+        const cursor = collection.find(queryFilter, {
+          projection,
+          limit: limit || 100,
+        });
+        const results = await cursor.toArray();
 
-          return {
-            content: [
-              {
-                type: "text",
-                text: JSON.stringify(explainResult, null, 2),
-              },
-            ],
-          };
-        } else {
-          // Regular query execution
-          const cursor = collection.find(queryFilter, {
-            projection,
-            limit: limit || 100,
-          });
-          const results = await cursor.toArray();
-
-          return {
-            content: [
-              {
-                type: "text",
-                text: JSON.stringify(results, null, 2),
-              },
-            ],
-          };
-        }
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify(results, null, 2),
+            },
+          ],
+        };
       } catch (error) {
         if (error instanceof Error) {
           throw new Error(
