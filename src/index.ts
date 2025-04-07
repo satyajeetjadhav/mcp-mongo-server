@@ -187,6 +187,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
         name: "query",
         description:
           "Execute a MongoDB query with optional execution plan analysis",
+        strict: true,
         inputSchema: {
           type: "object",
           properties: {
@@ -206,14 +207,9 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
               type: "number",
               description: "Maximum number of documents to return",
             },
-            explain: {
-              type: "string",
-              description:
-                "Optional: Get query execution information (queryPlanner, executionStats, or allPlansExecution)",
-              enum: ["queryPlanner", "executionStats", "allPlansExecution"],
-            },
           },
-          required: ["collection", "filter", "projection", "limit", "explain"],
+          required: ["collection", "filter", "projection", "limit"],
+          additionalProperties: false,
         },
       },
       {
