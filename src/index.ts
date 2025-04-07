@@ -530,7 +530,32 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           filter !== null &&
           !Array.isArray(filter)
         ) {
-          queryFilter = filter;
+          // Check if this is a structured filter with field, value, operator properties
+          interface StructuredFilter {
+            field: string;
+            value: any;
+            operator: string;
+          }
+
+          const isStructuredFilter = (obj: any): obj is StructuredFilter =>
+            typeof obj.field === "string" &&
+            obj.hasOwnProperty("value") &&
+            typeof obj.operator === "string";
+
+          if (isStructuredFilter(filter)) {
+            // Transform to MongoDB query format
+            queryFilter = {
+              [filter.field]: { [filter.operator]: filter.value },
+            };
+
+            // If operator is $eq, we can simplify to { field: value } format
+            if (filter.operator === "$eq") {
+              queryFilter = { [filter.field]: filter.value };
+            }
+          } else {
+            // Use the filter object directly if it's already in MongoDB format
+            queryFilter = filter;
+          }
         } else {
           throw new Error("Query filter must be a plain object or ObjectId");
         }
