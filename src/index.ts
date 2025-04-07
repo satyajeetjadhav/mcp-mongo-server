@@ -494,6 +494,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
  * Executes queries and returns results.
  */
 server.setRequestHandler(CallToolRequestSchema, async (request) => {
+  const collection = db.collection(request.params.arguments?.collection);
   // Define write operations that should be blocked in read-only mode
   const writeOperations = ["update", "insert", "createIndex"];
 
@@ -506,8 +507,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
   switch (request.params.name) {
     case "query": {
-      const { filter, projection, limit, collection } =
-        request.params.arguments || {};
+      const { filter, projection, limit } = request.params.arguments || {};
 
       // Validate collection name to prevent access to system collections
       if (typeof collection === "string" && collection.startsWith("system.")) {
