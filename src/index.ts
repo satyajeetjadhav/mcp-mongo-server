@@ -189,6 +189,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
           "Execute a MongoDB query with optional execution plan analysis",
         inputSchema: {
           type: "object",
+          strict: true,
           properties: {
             collection: {
               type: "string",
